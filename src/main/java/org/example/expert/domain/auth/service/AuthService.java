@@ -27,13 +27,19 @@ public class AuthService {
     @Transactional
     public SignupResponse signup(SignupRequest signupRequest) {
 
-        String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
+        // email이 없으면 바로 예외를 던지고 함수 종료
+        if (signupRequest.getEmail() == null || signupRequest.getEmail().isEmpty()) {
+            throw new InvalidRequestException("이메일이 비어있습니다.");
+        }
 
-        UserRole userRole = UserRole.of(signupRequest.getUserRole());
-
+        // email 중복 여부를 먼저 확인
         if (userRepository.existsByEmail(signupRequest.getEmail())) {
             throw new InvalidRequestException("이미 존재하는 이메일입니다.");
         }
+
+        // password 인코딩은 중복 확인 후에 수행
+        String encodedPassword = passwordEncoder.encode(signupRequest.getPassword());
+        UserRole userRole = UserRole.of(signupRequest.getUserRole());
 
         User newUser = new User(
                 signupRequest.getEmail(),
