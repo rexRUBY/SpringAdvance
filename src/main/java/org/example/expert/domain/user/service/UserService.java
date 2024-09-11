@@ -25,11 +25,7 @@ public class UserService {
 
     @Transactional
     public void changePassword(long userId, UserChangePasswordRequest userChangePasswordRequest) {
-        if (userChangePasswordRequest.getNewPassword().length() < 8 ||
-                !userChangePasswordRequest.getNewPassword().matches(".*\\d.*") ||
-                !userChangePasswordRequest.getNewPassword().matches(".*[A-Z].*")) {
-            throw new InvalidRequestException("새 비밀번호는 8자 이상이어야 하고, 숫자와 대문자를 포함해야 합니다.");
-        }
+        validatePasswordComplexity(userChangePasswordRequest.getNewPassword());
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new InvalidRequestException("User not found"));
@@ -43,5 +39,18 @@ public class UserService {
         }
 
         user.changePassword(passwordEncoder.encode(userChangePasswordRequest.getNewPassword()));
+    }
+
+    public void validatePasswordComplexity(String password) {
+        // 상수를 사용해 가독성 향상
+        final int MIN_LENGTH = 8;
+        final String DIGIT_REGEX = ".*\\d.*";
+        final String UPPERCASE_REGEX = ".*[A-Z].*";
+
+        if (password.length() < MIN_LENGTH ||
+                !password.matches(DIGIT_REGEX) ||
+                !password.matches(UPPERCASE_REGEX)) {
+            throw new InvalidRequestException("새 비밀번호는 8자 이상이어야 하고, 숫자와 대문자를 포함해야 합니다.");
+        }
     }
 }
