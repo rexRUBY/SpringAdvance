@@ -8,6 +8,8 @@ import org.example.expert.domain.comment.repository.CommentRepository;
 import org.example.expert.domain.common.dto.AuthUser;
 import org.example.expert.domain.common.exception.InvalidRequestException;
 import org.example.expert.domain.common.exception.ServerException;
+import org.example.expert.domain.manager.entity.Manager;
+import org.example.expert.domain.manager.repository.ManagerRepository;
 import org.example.expert.domain.todo.entity.Todo;
 import org.example.expert.domain.todo.repository.TodoRepository;
 import org.example.expert.domain.user.entity.User;
@@ -19,6 +21,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +38,8 @@ class CommentServiceTest {
     private CommentRepository commentRepository;
     @Mock
     private TodoRepository todoRepository;
+    @Mock
+    private ManagerRepository managerRepository;
     @InjectMocks
     private CommentService commentService;
 
@@ -45,6 +50,7 @@ class CommentServiceTest {
         CommentSaveRequest request = new CommentSaveRequest("contents");
         AuthUser authUser = new AuthUser(1L, "email", UserRole.USER);
 
+        // 할일을 찾지 못한 경우, repository에서 Optional.empty()를 반환
         given(todoRepository.findById(anyLong())).willReturn(Optional.empty());
 
         // when
@@ -56,25 +62,35 @@ class CommentServiceTest {
         assertEquals("Todo not found", exception.getMessage());
     }
 
+
     @Test
     void comment를_정상적으로_등록한다() {
         // given
-        long todoId = 1;
+        long todoId = 1L;
         CommentSaveRequest request = new CommentSaveRequest("contents");
         AuthUser authUser = new AuthUser(1L, "email", UserRole.USER);
         User user = User.fromAuthUser(authUser);
-        Todo todo = new Todo("title", "title", "contents", user);
+        Todo todo = new Todo("title", "contents", "weather", user);
         Comment comment = new Comment(request.getContents(), user, todo);
 
-        given(todoRepository.findById(anyLong())).willReturn(Optional.of(todo));
-        given(commentRepository.save(any())).willReturn(comment);
+        // 매니저 리스트에 현재 유저가 포함되어 있는 경우를 모킹
+        Manager manager = new Manager(user, todo); // 매니저 객체 생성
+        List<Manager> managers = new ArrayList<>();
+        managers.add(manager);
+
+        // 할일을 찾고, 매니저 리스트에 유저가 포함되어 있으며, 댓글이 저장되는 상황을 모킹
+        given(todoRepository.findById(anyLong())).willReturn(Optional.of(todo)); // 할일 찾기
+        given(managerRepository.findByTodoIdWithUser(todo.getId())).willReturn(managers); // 매니저 리스트 반환
+        given(commentRepository.save(any(Comment.class))).willReturn(comment); // 댓글 저장
 
         // when
         CommentSaveResponse result = commentService.saveComment(authUser, todoId, request);
 
         // then
         assertNotNull(result);
+        assertEquals(comment.getContents(), result.getContents()); // 저장된 댓글의 내용이 일치하는지 확인
     }
+
 
     @Test
     void 댓글_목록_가져오기_성공() {

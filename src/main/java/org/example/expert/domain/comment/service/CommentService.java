@@ -8,6 +8,8 @@ import org.example.expert.domain.comment.entity.Comment;
 import org.example.expert.domain.comment.repository.CommentRepository;
 import org.example.expert.domain.common.dto.AuthUser;
 import org.example.expert.domain.common.exception.InvalidRequestException;
+import org.example.expert.domain.manager.entity.Manager;
+import org.example.expert.domain.manager.repository.ManagerRepository;
 import org.example.expert.domain.todo.entity.Todo;
 import org.example.expert.domain.todo.repository.TodoRepository;
 import org.example.expert.domain.user.dto.response.UserResponse;
@@ -25,12 +27,24 @@ public class CommentService {
 
     private final TodoRepository todoRepository;
     private final CommentRepository commentRepository;
+    private final ManagerRepository managerRepository;
 
     @Transactional
     public CommentSaveResponse saveComment(AuthUser authUser, long todoId, CommentSaveRequest commentSaveRequest) {
         User user = User.fromAuthUser(authUser);
         Todo todo = todoRepository.findById(todoId).orElseThrow(() ->
                 new InvalidRequestException("Todo not found"));
+
+        // 매니저 리스트에서 현재 사용자가 매니저로 등록되어 있는지 확인
+        List<Manager> managers = managerRepository.findByTodoIdWithUser(todo.getId());
+
+        // 현재 사용자가 매니저 리스트에 포함되지 않으면 예외 발생
+        boolean isManager = managers.stream()
+                .anyMatch(manager -> manager.getUser().getId().equals(user.getId()));
+
+        if (!isManager) {
+            throw new InvalidRequestException("You are not authorized to comment on this todo");
+        }
 
         Comment newComment = new Comment(
                 commentSaveRequest.getContents(),
@@ -46,6 +60,7 @@ public class CommentService {
                 new UserResponse(user.getId(), user.getEmail())
         );
     }
+
 
     public List<CommentResponse> getComments(long todoId) {
         List<Comment> commentList = commentRepository.findByTodoIdWithUser(todoId);
